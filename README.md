@@ -3,6 +3,9 @@
 This is simple python application to generate SQL Schema + prompt to ask GPT-3 to generate SQL queries.
 It also has a simple UI to show results in a table.
 
+![](https://github.com/Hormold/gpt-sql-box/blob/master/docs/demo.gif?raw=true)
+
+
 ## How it works:
 1. Getting SQL schemas from PostgreSQL
 2. Compile prompt from SQL Schema
