@@ -35,7 +35,6 @@ def index():
     normalized_json_data = json.dumps(json_data);
     return render_template(
         'index.html',
-        prompt=prompt,
         sql_schema=sql_schema,
         json_data=normalized_json_data
     )

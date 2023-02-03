@@ -14,6 +14,13 @@
 		.container {
 			margin-top: 100px;
 		}
+		ul {
+			list-style-type: none;
+			padding: 10px;
+		}
+		input[type=checkbox] {
+			margin-right: 5px;
+		}
 	</style>
 	<!-- Vue -->
 	<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
@@ -60,11 +67,20 @@
 								<p>SQL Strucutre (select tables to use to generate query):</p>
 								<small class="text-muted">
 									<!-- each  -->
-									<span v-for="(item, key) in schema">
-										<input type="checkbox" v-model="schema[key].selected" :value="key"
+									<ul>
+									<li v-for="(item, key) in schema" v-if="item.length > 0">
+										<input
+											type="checkbox"
+											v-model="schema[key].selected"
+											:value="key"
+											:id="key"
+											:name="key"
 											@change="updateSchema(key)">
-										<b>[[key]]:</b> [[item.map( r=> r.name).join(", ")]] [[item.selected]]<br>
-									</span>
+										<label :for="key">
+											<b>[[key]]:</b> [[item.map( r=> r.name).join(", ")]]
+										</label>
+									</li>
+									</ul>
 									<button type="button" class="btn btn-default btn-sm" @click="selectAll">
 										<span class="glyphicon glyphicon-check"></span> Select All
 									</button>
