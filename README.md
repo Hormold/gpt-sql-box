@@ -22,7 +22,8 @@ It also has a simple UI to show results in a table.
 ## How to run
 1. It better to create a virtual environment using `python3 -m venv venv`
 2. Install dependencies using `pip install -r requirements.txt`
-3. And run the application using `python app.py`
+3. Set environment variables in `.env` file in project root or in your system
+4. Run the application using `python app.py` and open `http://localhost:5000` in your browser
 
 ## Contact 
-If you have any questions, please contact me at (t.me/define)[https://t.me/define]
+If you have any questions, please contact me at [t.me/define](https://t.me/define)
