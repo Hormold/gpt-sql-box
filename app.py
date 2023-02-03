@@ -73,14 +73,18 @@ def generate():
             stop=["\n\n"]
         )
 
+        used_tokens = gpt_response['usage']['total_tokens']
+
         # Get SQL query
         sql_query = gpt_response['choices'][0]['text']
+        sql_query = sql_query.lstrip().rstrip()
         print('Generated SQL query:', sql_query)
 
         # Return json
         return {
             'success': True,
-            'sql_query': sql_query
+            'sql_query': sql_query,
+            'used_tokens': used_tokens,
         }
     except Exception as err:
         print(err)

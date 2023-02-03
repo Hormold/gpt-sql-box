@@ -21,38 +21,47 @@
 		input[type=checkbox] {
 			margin-right: 5px;
 		}
+		.fork-me {
+			position: absolute;
+			top: 0;
+			right: 0;
+		}
 	</style>
 	<!-- Vue -->
 	<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
 </head>
 
 <body>
-	<!-- Draw a container in center of page (verical and horizontal)
-	with a textarea box (large, few lines) for input text based prompt and submit button.
-	below result table.
-	-->
+	<div class="fork-me">
+		<a href="https://github.com/Hormold/gpt-sql-box" target="_blank">
+			<img src="https://github.blog/wp-content/uploads/2008/12/forkme_right_gray_6d6d6d.png?resize=149%2C149" alt="Fork me on GitHub">
+		</a>
+	</div>
+
+
 	<div id="app">
 		<div class="container">
 			<div class="row">
 				<div class="col-md-8 col-md-offset-2" v-if="view === 'index'">
 					<div class="panel panel-default">
 						<div class="panel-heading">
-							<h3 class="panel-title">GPT SQL Query</h3>
+							<h3 class="panel-title">GPT SQL Query: Configuation</h3>
 						</div>
 						<div class="panel-body">
 							<fieldset>
 								<div class="form-group">
-									<textarea class="form-control" v-model="query" placeholder="Enter Prompt Query"
+									<textarea class="form-control" v-model="query" placeholder="Enter text request to generate SQL query"
+										rows="5"
 										name="query" type="text"></textarea>
 								</div>
 								<!-- slider with temperature edit from 0.1 to 1 -->
 								<div class="form-group">
-									<label for="temp">OpenAI Query Temperature ([[temp]]):</label>
+									<label for="temp">OpenAI Query Temperature ([[temp]])*:</label>
 									<input type="range" class="form-control-range" name="temp" id="temp" min="0.1"
 										v-model="temp" max="1" step="0.1" value="0.5">
 								</div>
 								<div v-if="!isLoading">
-									<input class="btn btn-lg btn-success btn-block" type="submit" value="Submit"
+									<input class="btn btn-lg btn-success btn-block" type="submit" value="🧙‍♂️ Do Magic!"
 										@click="generate">
 								</div>
 								<div v-else>
@@ -63,7 +72,7 @@
 								</div>
 							</fieldset>
 							<!-- small prompt  -->
-							<div class="panel-footer">
+							<div class="panel-footer" style="margin-top: 20px; border-radius: 5px;">
 								<p>SQL Strucutre (select tables to use to generate query):</p>
 								<small class="text-muted">
 									<!-- each  -->
@@ -90,6 +99,11 @@
 								</small>
 							</div>
 						</div>
+						<div class="panel-footer">
+							<small class="text-muted">Adjusting OpenAI temperature will change the randomness of the generated
+								query. Higher temperature will generate more random queries, while lower temperature will
+								generate more predictable queries. Using the huge number of tables can increase the cost of query.</small>
+						</div>
 					</div>
 				</div>
 
@@ -114,8 +128,17 @@
 										v-model="sql_query"></textarea>
 								</div>
 								<div v-if="!isLoading">
-									<input class="btn btn-lg btn-success btn-block" type="submit" value="Run"
-										@click="runQuery">
+									<!-- row of two buttons - refresh & run -->
+									<div class="row">
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" :value="'🧙‍♂️ Regenerate (~' + (used_tokens) + ' tokens)'"
+												@click="generate">
+										</div>
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" value="🚀 Run query"
+												@click="runQuery">
+										</div>
+									</div>
 								</div>
 								<div v-else>
 									<button class="btn btn-lg btn-success btn-block" type="button" disabled>
@@ -202,6 +225,7 @@
 				results: [],
 				isLoading: false,
 				seconds_elapsed: 0,
+				used_tokens: 0,
 			},
 
 			created() {
@@ -213,6 +237,9 @@
 						this.schema[key].selected = false;
 					}
 				}
+
+				//this.view = 'generate';
+				//this.sql_query = "SELECT * FROM users WHERE username LIKE 'A%' ORDER BY created_at DESC LIMIT 10;"
 			},
 
 			methods: {
@@ -241,7 +268,8 @@
 				},
 
 				generate: async function () {
-					// fetch
+					if(this.query === '' || this.isLoading)
+						return;
 					this.isLoading = true;
 					const response = await fetch('/generate', {
 						method: 'POST',
@@ -259,6 +287,7 @@
 					this.isLoading = false;
 					if(data.success) {
 						this.sql_query = data.sql_query;
+						this.used_tokens = data.used_tokens;
 						this.view = 'generate';
 					} else {
 						alert(data.error);
