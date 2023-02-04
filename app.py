@@ -18,10 +18,12 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
     print('Please set DATABASE_URL in .env file.')
     sys.exit(1)
-openai.api_key = os.getenv('OPENAI_TOKEN')
-if not os.getenv('OPENAI_TOKEN'):
-    print('Please set OPENAI_TOKEN in .env file.')
-    sys.exit(1)
+
+if os.getenv('OPENAI_TOKEN'):
+    openai.api_key = os.getenv('OPENAI_TOKEN')
+
+if not openai.api_key:
+    print('Please set OPENAI_TOKEN in .env file or set token in UI') # Not a critical error
 
 # Generate SQL Schema from PostgreSQL
 schema = Schema()
@@ -31,10 +33,10 @@ print('SQL data was generated successfully.')
 @app.get('/')
 def index():
     """Show SQL Schema + prompt to ask GPT-3 to generate SQL queries"""
-    # Get JSON data (not escaped)
-    normalized_json_data = json.dumps(json_data);
+    normalized_json_data = json.dumps(json_data)
     return render_template(
         'index.html',
+        has_openai_key=bool(openai.api_key),
         sql_schema=sql_schema,
         json_data=normalized_json_data
     )
@@ -44,13 +46,24 @@ def generate():
     """Generate SQL query from prompt + user input"""
     try:
         content = request.json
-        print('Content:', content)
         user_input = content['query']
         query_temperture = content['temp']
         selected = content['selected']
         print('Selected tables:', selected)
         print('User input:', user_input)
         print('Query temperture:', query_temperture)
+
+        if not content['api_key'] and not openai.api_key:
+            return {
+                'success': False,
+                'error': 'Please set OPENAI_TOKEN in .env file or set token in UI'
+            }
+
+        if content['api_key'] and not openai.api_key:
+            openai.api_key = content['api_key'] # Inject API key from UI
+            print('API key was set from UI')
+        else:
+            print('API key was set from .env file')
 
         # Update prompt
         regen_schema = schema.regen(selected)
@@ -90,7 +103,7 @@ def generate():
         print(err)
         return {
             'success': False,
-            'sql_query': err
+            'error': str(err)
         }
 
 @app.post('/run')
@@ -123,13 +136,65 @@ def execute():
         print(err)
         return {
             'success': False,
-            'error': err
+            'error': str(err)
         }
     except Exception as err:
         print(err)
         return {
             'success': False,
-            'error': err
+            'error': str(err)
+        }
+
+@app.post('/generate_prompt')
+def generate_prompt():
+    """Generate prompt from selected tables"""
+    try:
+        content = request.json
+        selected = content['selected']
+        query_temperture = content['temp']
+
+        if not content['api_key'] and not openai.api_key:
+            return {
+                'success': False,
+                'error': 'Please set OPENAI_TOKEN in .env file or set token in UI'
+            }
+
+        if content['api_key'] and not openai.api_key:
+            openai.api_key = content['api_key']
+
+        # Update prompt
+        regen_schema = schema.regen(selected)
+        final_prompt = f'Your task is create creative prompt, using this scheme of database: {regen_schema}\n\nDo not generate SQL query, generate text based prompt:\n\n'
+
+        gpt_response = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=final_prompt,
+            temperature=float(query_temperture),
+            max_tokens=500,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0,
+            stop=["\n\n"]
+        )
+
+        print(gpt_response)
+
+        used_tokens = gpt_response['usage']['total_tokens']
+
+        # Get SQL query
+        query = gpt_response['choices'][0]['text'].lstrip().rstrip()
+        print('Generated prompt:', query)
+
+        return {
+            'success': True,
+            'query': query,
+            'used_tokens': used_tokens,
+        }
+    except Exception as err:
+        print(err)
+        return {
+            'success': False,
+            'error': str(err)
         }
 
 

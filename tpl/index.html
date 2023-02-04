@@ -42,6 +42,31 @@
 	<div id="app">
 		<div class="container">
 			<div class="row">
+
+				<div class="col-md-8 col-md-offset-2" v-if="view === 'setkey'">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<h3 class="panel-title">Set OpenAI Token</h3>
+						</div>
+						<div class="panel-body">
+							<p>Looks like API token is not set in environment variable. Please enter your OpenAI API token below and it will be saved to browser localStorage</p>
+							<fieldset>
+								<div class="form-group">
+									<input class="form-control" v-model="key" placeholder="Enter OpenAI API token"
+										name="key" type="text">
+								</div>
+								<div>
+									<input class="btn btn-lg btn-success btn-block" type="submit" value="Save to localStorage and continue"
+										@click="setKey">
+								</div>
+							</fieldset>
+						</div>
+						<div class="panel-footer">
+							<span class="text-muted">You can get your OpenAI API token <a href="https://beta.openai.com/account/api-keys" target="_blank">here</a>.</span>
+						</div>
+					</div>
+				</div>
+
 				<div class="col-md-8 col-md-offset-2" v-if="view === 'index'">
 					<div class="panel panel-default">
 						<div class="panel-heading">
@@ -61,8 +86,15 @@
 										v-model="temp" max="1" step="0.1" value="0.5">
 								</div>
 								<div v-if="!isLoading">
-									<input class="btn btn-lg btn-success btn-block" type="submit" value="🧙‍♂️ Do Magic!"
-										@click="generate">
+									<div class="row">
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" value="🧙‍♂️ Do Magic!" @click="generate">
+										</div>
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" value="🤷‍♂️ I don't know what to ask" @click="generateRandom">
+										</div>
+									</div>
+									
 								</div>
 								<div v-else>
 									<button class="btn btn-lg btn-success btn-block" type="button" disabled>
@@ -122,13 +154,21 @@
 						</div>
 
 						<div class="panel-body">
+							<div class="alert alert-warning" role="alert" v-if="sql_error">
+								<b>Error in generated query:</b> [[sql_error]]
+							</div>
 							<fieldset>
 								<div class="form-group">
-									<textarea class="form-control" name="query" type="text" rows="15" cols="90"
-										v-model="sql_query"></textarea>
+									<textarea
+										class="form-control"
+										name="query"
+										type="text" 
+										cols="80"
+										rows="12"
+										v-model="sql_query">
+									</textarea>
 								</div>
 								<div v-if="!isLoading">
-									<!-- row of two buttons - refresh & run -->
 									<div class="row">
 										<div class="col-md-6">
 											<input class="btn btn-lg btn-success btn-block" type="submit" :value="'🧙‍♂️ Regenerate (~' + (used_tokens) + ' tokens)'"
@@ -181,9 +221,6 @@
 								</tbody>
 							</table>
 						</div>
-
-						<!-- Execution time -->
-
 					</div>
 					<div class="panel-footer">
 						<div class="pull-right">
@@ -210,11 +247,12 @@
 	</div>
 
 	<!-- Vue -->
-	<script>
+	<script lang="javascript">
 		var app = new Vue({
 			el: '#app',
 			delimiters: ['[[', ']]'],
 			data: {
+				hasOpenAIKey: '{{has_openai_key}}',
 				sql_schema: '{{sql_schema}}',
 				in_schema: JSON.parse('{{json_data|safe}}'),
 				sql_query: '',
@@ -226,10 +264,16 @@
 				isLoading: false,
 				seconds_elapsed: 0,
 				used_tokens: 0,
+				key: '',
+				sql_error: null
 			},
 
 			created() {
-				this.schema = this.in_schema;
+				if(localStorage.getItem('openai_key'))
+					this.key = localStorage.getItem('openai_key')
+				if(this.hasOpenAIKey === 'False' && !this.key)
+					this.view = 'setkey'
+				this.schema = this.in_schema
 				for (var key in this.schema) {
 					if (localStorage.getItem(key) === 'true') {
 						this.schema[key].selected = true;
@@ -238,11 +282,18 @@
 					}
 				}
 
-				//this.view = 'generate';
-				//this.sql_query = "SELECT * FROM users WHERE username LIKE 'A%' ORDER BY created_at DESC LIMIT 10;"
+				this.view = 'generate';
+				this.sql_query = "SELECT * FROM usfers WHERE fusername LIKE 'A%' ORDER BY created_at DESC LIMIT 10;"
 			},
 
 			methods: {
+
+				setKey: function () {
+					if(!this.key.match(/^sk-([a-zA-Z0-9]{1,64})$/))
+						return alert('Invalid key, it should be in the format sk-[a-zA-Z0-9]{32}');
+					this.view = 'index';
+					localStorage.setItem('openai_key', this.key);
+				},
 
 				updateSchema: function (key) {
 					// save to localStorage
@@ -267,10 +318,37 @@
 					this.$forceUpdate();
 				},
 
+				generateRandom: async function () {
+					if(this.isLoading)
+						return;
+					this.isLoading = true;
+
+					const response = await fetch('/generate_prompt', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							temp: this.temp,
+							api_key: this.key,
+							selected: Object.keys(this.schema).filter(key => this.schema[key]
+								.selected)
+						})
+					});
+
+					const data = await response.json();
+					this.isLoading = false;
+					if(!data.success)
+						return alert(data.error);
+					this.query = data.query;
+				},
+
 				generate: async function () {
 					if(this.query === '' || this.isLoading)
 						return;
 					this.isLoading = true;
+					this.sql_error = null;
+
 					const response = await fetch('/generate', {
 						method: 'POST',
 						headers: {
@@ -279,10 +357,12 @@
 						body: JSON.stringify({
 							query: this.query,
 							temp: this.temp,
+							api_key: this.key,
 							selected: Object.keys(this.schema).filter(key => this.schema[key]
 								.selected)
 						})
 					});
+
 					const data = await response.json();
 					this.isLoading = false;
 					if(data.success) {
@@ -297,6 +377,7 @@
 				runQuery: async function () {
 					// fetch
 					this.isLoading = true;
+					this.sql_error = null;
 					const response = await fetch('/run', {
 						method: 'POST',
 						headers: {
@@ -314,7 +395,7 @@
 						this.seconds_elapsed = data.seconds_elapsed;
 						this.view = 'run';
 					} else {
-						alert(data.error);
+						this.sql_error = data.error;
 					}
 				},
 

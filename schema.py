@@ -11,6 +11,7 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 
 class Schema:
     """Generate SQL Schema from PostgreSQL"""
+    
     def __init__(self, schema = 'public'):
         """Connect to PostgreSQL database"""
         self.schema = schema
@@ -25,6 +26,7 @@ class Schema:
         self.comments = []
         self.tables = []
         self.columns = []
+
     def get_tables(self):
         """Get list of tables"""
         self.cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = %s", (self.schema,))
