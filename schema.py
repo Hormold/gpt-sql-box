@@ -43,7 +43,6 @@ class Schema:
 
     def get_columns(self, table):
         """Get list of columns for a table"""
-        # Get column names, types and comments if available
         self.cur.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = %s AND table_name = %s", (self.schema, table))
         columns = self.cur.fetchall()
         return columns
