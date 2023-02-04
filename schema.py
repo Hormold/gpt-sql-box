@@ -11,7 +11,7 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 
 class Schema:
     """Generate SQL Schema from PostgreSQL"""
-    
+
     def __init__(self, schema = 'public'):
         """Connect to PostgreSQL database"""
         self.schema = schema
@@ -50,6 +50,8 @@ class Schema:
 
     def regen(self, selected):
         """Regenerate SQL Schema only for selected tables"""
+        if len(selected) == 0:
+            return 'No tables selected.'
         prompt = ''
         tables = self.tables
         comments = self.comments
@@ -67,7 +69,7 @@ class Schema:
                         prompt += f'{column[0]} ({column[1]}), '
                     else:
                         prompt += f'{column[0]} ({column[1]} - {cmnt}), '
-                    prompt = prompt[:-2] + '. '
+                prompt = prompt[:-2] + '. '
         return prompt
 
     def index(self):
@@ -96,5 +98,5 @@ class Schema:
                     'comment': cmnt,
                     "seleted": True
                 })
-                prompt = prompt[:-2] + '. '    
+            prompt = prompt[:-2] + '. '
         return prompt, json_data
