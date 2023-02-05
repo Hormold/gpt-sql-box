@@ -1,7 +1,10 @@
-# GPT-3 SQL Query Generator and UI
+# GPT-3 SQL Query Generator and UI (And AI Chart Generator)
 
 This is simple python application to generate SQL Schema + prompt to ask GPT-3 to generate SQL queries.
-It also has a simple UI to show results in a table.
+
+It also has a simple UI to show results in a table. And yes, **you can try to generate a chart from the results of query**.
+
+GPT-3 self choose the chart type and prepare the data for it (it is not perfect, but it is a good start).
 
 **It can generate a prompt for you, if you don't know what to ask GPT-3.**
 
@@ -19,6 +22,7 @@ It also has a simple UI to show results in a table.
 - DATABASE_URL: PostgreSQL database URL
 - OPENAI_TOKEN: OpenAI API token (Not nessessary, you can set it in the UI)
 - APP_PORT: Port to run the application (default: 5000)
+- OPENAI_ENGINE: OpenAI engine to use (default: text-davinci-003, not nessessary). You can set some free to use model: text-chat-davinci-002-20221122
 
 ## How to run
 1. It better to create a virtual environment using `python3 -m venv venv`
