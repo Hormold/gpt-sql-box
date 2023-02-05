@@ -1,0 +1,4 @@
+Your task is create creative prompt, using this scheme of database: {regen_schema}
+Generate a prompt for database data extract, not project description.
+Do not generate SQL query, generate text based prompt.
+Result: 

@@ -12,7 +12,9 @@ from schema import Schema
 app = Flask(__name__, template_folder='tpl')
 # Read .env file
 load_dotenv()
+OPENAI_ENGINE = os.getenv('OPENAI_ENGINE') or 'text-davinci-003'
 TEMPLATE_DIR = os.path.abspath('./tpl')
+PROMPT_DIR = os.path.abspath('./prompts')
 APP_PORT = os.getenv('APP_PORT') or 5000
 DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
@@ -29,6 +31,31 @@ if not openai.api_key:
 schema = Schema()
 sql_schema, json_data = schema.index()
 print('SQL data was generated successfully.')
+
+def load_prompt(name: str) -> str:
+    """Load prompt from file"""
+    with open(os.path.join(PROMPT_DIR, name + ".txt"), 'r', encoding='utf-8') as file:
+        return file.read()
+
+# Middleware to check key in request or in .env file
+@app.before_request
+def get_key():  
+    """Get API key from request or .env file"""
+    if (request.content_type != 'application/json'
+        or request.method != 'POST'
+        or request.path == '/run'):
+        return
+    content = request.json
+    if not content['api_key'] and not openai.api_key:
+        return {
+            'success': False,
+            'error': 'Please set OPENAI_TOKEN in .env file or set token in UI'
+        }
+
+    if content and content['api_key']:
+        request.api_key = content['api_key']
+    else:
+        request.api_key = os.getenv('OPENAI_TOKEN')
 
 @app.get('/')
 def index():
@@ -53,31 +80,16 @@ def generate():
         print('User input:', user_input)
         print('Query temperture:', query_temperture)
 
-        if not content['api_key'] and not openai.api_key:
-            return {
-                'success': False,
-                'error': 'Please set OPENAI_TOKEN in .env file or set token in UI'
-            }
-
-        if content['api_key'] and not openai.api_key:
-            openai.api_key = content['api_key'] # Inject API key from UI
-            print('API key was set from UI')
-        else:
-            print('API key was set from .env file')
-
-        # Update prompt
+        openai.api_key = request.api_key
         regen_schema = schema.regen(selected)
-        new_prompt = f'Given an input question, respond with syntactically correct PostgreSQL. Be creative but the SQL must be correct, not nessesary to use all tables. {regen_schema}'
-        print('New prompt:', new_prompt)
-    
-
-        # Generate SQL query from prompt + user input
-        final_prompt = f'{new_prompt}\n\nInstructions: {user_input}\n\nSQL:\n'
+        fprompt = load_prompt('sql').replace('{regen_schema}', regen_schema).replace('{user_input}', user_input)
+        # Edit prompt on the fly by editing prompts/sql.txt
+        print(f'Final prompt: {fprompt}')
 
         # Ask GPT-3
         gpt_response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=final_prompt,
+            engine=OPENAI_ENGINE,
+            prompt=fprompt,
             temperature=float(query_temperture),
             max_tokens=500,
             top_p=1,
@@ -153,21 +165,15 @@ def generate_prompt():
         selected = content['selected']
         query_temperture = content['temp']
 
-        if not content['api_key'] and not openai.api_key:
-            return {
-                'success': False,
-                'error': 'Please set OPENAI_TOKEN in .env file or set token in UI'
-            }
-
-        if content['api_key'] and not openai.api_key:
-            openai.api_key = content['api_key']
+        openai.api_key = request.api_key
 
         # Update prompt
         regen_schema = schema.regen(selected)
-        final_prompt = f'Your task is create creative prompt, using this scheme of database: {regen_schema}\n\nDo not generate SQL query, generate text based prompt:\n\n'
+        final_prompt = load_prompt('idk').replace('{regen_schema}', regen_schema)
+        print(f'Final prompt: {final_prompt}')
 
         gpt_response = openai.Completion.create(
-            engine="text-davinci-003",
+            engine=OPENAI_ENGINE,
             prompt=final_prompt,
             temperature=float(query_temperture),
             max_tokens=500,
@@ -176,8 +182,6 @@ def generate_prompt():
             presence_penalty=0,
             stop=["\n\n"]
         )
-
-        print(gpt_response)
 
         used_tokens = gpt_response['usage']['total_tokens']
 
@@ -197,6 +201,40 @@ def generate_prompt():
             'error': str(err)
         }
 
+@app.post('/generate_chart')
+def generate_chart():
+    """Generate chart from SQL query"""
+    content = request.json
+    csv_data = str(content['csv_data'])
+    query_temperture = float(content['temp'])
+    print('CSV data:', csv_data)
+    print('Query temperture:', query_temperture)
+    #chart_type = content['chart_type'] # bar, line, pie, scatter
+    example_prompt = load_prompt('graph').replace('{csv_data}', csv_data)
+
+    openai.api_key = request.api_key
+    gpt_response = openai.Completion.create(
+        engine=OPENAI_ENGINE,
+        prompt=example_prompt,
+        temperature=float(query_temperture),
+        max_tokens=300,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0,
+        stop=["\n\n"]
+    )
+
+    used_tokens = gpt_response['usage']['total_tokens']
+    pseudo_code = gpt_response['choices'][0]['text'].lstrip().rstrip();
+    chart_type = pseudo_code.split('|')[0]
+    chart_data = pseudo_code.split('|')[1]
+
+    return {
+        'success': True,
+        'chart_type': chart_type,
+        'chart_data': chart_data,
+        'used_tokens': used_tokens,
+    }
 
 # Run web app
 if __name__ == '__main__':

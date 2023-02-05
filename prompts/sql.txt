@@ -1,0 +1,5 @@
+Given an input question, respond with syntactically correct PostgreSQL. Be creative but the SQL must be correct, not nessesary to use all tables. {regen_schema}
+
+Instructions: {user_input}
+
+SQL: 
